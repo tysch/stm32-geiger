@@ -3,14 +3,10 @@
 #include "stm32_lib/system_stm32f10x.h"
 
 #include "led_display.h"
-//#include "LCD.h"
 #include "driver_5110_lcd.h"
+#include "display.h"
 #include "xprintf.h"
-
-//#include <string.h>
-//#include <stdlib.h>
 #include <stdint.h>
-
 
 #include "stm32f10x_gpio.h"
 #include "stm32f10x_rcc.h"
@@ -18,170 +14,7 @@
 #include "stm32f10x_exti.h"
 #include "stm32f10x_tim.h"
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-void strcat(char * dest, const char * src)
-{
-	while(*dest) dest++;
-	while((*dest++ = *src++));
-}
-
-
-
-
-
-
-
-
-
-
-void format_readings(char * prefix, char * valstr, uint32_t val)
-{
-	char mju = 'z' + 3;
-    // Set range indication for main reading
-	if(val >= 100000000)
-	{
-		int r = val/1000000;
-		xsprintf(prefix, " "); 
-		xsprintf(valstr, "%4d", r);
-		return;
-	}
-	if((val >= 10000000) && (val <= 99999999))
-	{
-		int r = val/1000000;
-		int mr = (val % 1000000) / 100000;
-		xsprintf(prefix, " "); 
-		xsprintf(valstr, "%2d.%01d", r, mr);
-		return;
-	}
-	if((val >= 1000000) && (val <= 9999999))
-	{
-		int r = val/1000000;
-		int mr = (val % 1000000) / 10000;
-		xsprintf(prefix, " "); 
-		xsprintf(valstr, "%d.%02d", r, mr);
-		return;
-	}
-	if((val >= 100000) && (val <= 999999))
-	{
-		int mr = val/1000;
-		xsprintf(prefix, "m"); 
-		xsprintf(valstr, "%4d", mr);
-		return;
-	}
-	if((val >= 10000) && (val <= 99999))
-	{
-		int mr = val/1000;
-		int fr_mr = (val % 1000) / 100;
-		xsprintf(prefix, "m"); 
-		xsprintf(valstr, "%2d.%01d", mr, fr_mr);
-		return;
-	}
-	if((val >= 1000) && (val <= 9999))
-	{
-		int mr = val/1000;
-		int fr_mr = (val % 1000) / 10;
-		xsprintf(prefix, "m"); 
-		xsprintf(valstr, "%d.%02d", mr, fr_mr);
-		return;
-	}
-	if(val < 1000) 
-	{
-		xsprintf(valstr, "%4d", val);
-		xsprintf(prefix, "%c", mju); 
-		return;
-	}
-}
-
-
-
-
-
-
-
-
-
-char str[80];
-char tmpstr[80];
-char main_val_str[80];
-char sec_val_str_prefix[5];
-
-uint32_t number = 0;
-
-char battery = 'z' + 4;
-
-char plus_minus = 'z' + 2 ;
-
-
-void update_display(char sound, char battery_charge, uint32_t main_val, char main_err, uint32_t fast_val, char fast_err)
-{
-	LCD5110_set_XY(0,0);
-
-	// Set ticks indication
-	if(sound)
-	{
-	    str[0] = 'z' + 5; 
-		str[1] = '\0';
-	}
-	else
-	{
-	    str[0] = ' '; 
-		str[1] = '\0';
-	}
-
-	// Set battery indication
-	xsprintf(tmpstr, "        %c%3d%%                        ", battery, battery_charge);
-	strcat(str, tmpstr);
-
-    // Set range indication for main reading
-    format_readings(tmpstr, main_val_str, main_val);
-	strcat(str, tmpstr);
-
-	// Place units and error marking
-	xsprintf(tmpstr, "R/h          %c", plus_minus); 
-	strcat(str, tmpstr);
-
-	// Place main error 
-	xsprintf(tmpstr, "%2d%%              ", main_err);
-	strcat(str, tmpstr);
-
-	// Set range indication for secondary reading 
-	format_readings(sec_val_str_prefix, tmpstr, fast_val);
-	strcat(str, tmpstr);
-	strcat(str, sec_val_str_prefix);
-	xsprintf(tmpstr, "R/h %c%2d%%", plus_minus, fast_err);
-	strcat(str, tmpstr);
-
-	LCD5110_write_string(str);
-
-	LCD5110_num_string(main_val_str,9,10);
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+#include "filters.h"
 
 
 void SetSysClockTo72(void)
@@ -244,71 +77,24 @@ void SetSysClockTo72(void)
     }
 }
  
-void EXTI0_IRQHandler(void) {
-    /* Make sure that interrupt flag is set */
-    if (EXTI_GetITStatus(EXTI_Line0) != RESET) {
-        if (GPIO_ReadInputDataBit(GPIOB, GPIO_Pin_0) != 0) {
-            // Rising
-    //        TIM_SetCounter(TIM3, 0);
-
-		number++;
-      //  update_display();
-
-
-
-		update_display(1, 100, number, 2, 862197000, 5);
-
-
-
-
-
-
-        }
-  //      if (GPIO_ReadInputDataBit(GPIOB, GPIO_Pin_0) == 0) {
-  //          // Falling
-   //         SonarValue = TIM_GetCounter(TIM3);
-    //    }
+uint32_t number = 0;
+ 
+volatile uint8_t FLAG_ECHO = 0;
+volatile uint16_t SonarValue;
  
 
+void sonar_init() {
 
-        /* Clear interrupt flag */
-        EXTI_ClearITPendingBit(EXTI_Line0);
-    }
-}
-
-
-
-int main(void)
-{
-display_init();
-
-
-
-SetSysClockTo72();
-
-
-
-
-    /* NVIC Configuration */
-    /* Enable the TIM4_IRQn Interrupt */
-//    NVIC_InitStructure.NVIC_IRQChannel = TIM4_IRQn;
-//    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
-//    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
-//    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
-//    NVIC_Init(&NVIC_InitStructure);
-
-
-
-
-
-    GPIO_InitTypeDef gpio_cfg;
-    GPIO_StructInit(&gpio_cfg);
+    /* Timer TIM3 enable clock */
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3, ENABLE);
  
-    //Trigger Pin
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
-    gpio_cfg.GPIO_Mode = GPIO_Mode_Out_PP;
-    gpio_cfg.GPIO_Pin = GPIO_Pin_15;
-    GPIO_Init(GPIOB, &gpio_cfg);
+    /* Timer TIM3 settings */
+    TIM_TimeBaseInitTypeDef timer_base;
+    TIM_TimeBaseStructInit(&timer_base);
+    timer_base.TIM_CounterMode = TIM_CounterMode_Up;
+    timer_base.TIM_Prescaler = 7200;
+    TIM_TimeBaseInit(TIM3, &timer_base);
+    TIM_Cmd(TIM3, ENABLE);
  
     //EXTI
  
@@ -351,63 +137,103 @@ SetSysClockTo72();
     EXTI_InitStruct.EXTI_Trigger = EXTI_Trigger_Rising_Falling;
     /* Add to EXTI */
     EXTI_Init(&EXTI_InitStruct);
+}
+ 
 
+uint32_t avgs1;
+uint32_t avgs2;
 
+void EXTI0_IRQHandler(void) {
+    /* Make sure that interrupt flag is set */
+    if (EXTI_GetITStatus(EXTI_Line0) != RESET) {
+        if (GPIO_ReadInputDataBit(GPIOB, GPIO_Pin_0) != 0) {
+            // Rising
+  //          SonarValue = TIM_GetCounter(TIM3);
+
+//		number = 10000 /  SonarValue ;
+//
+//		avgs1 *= 5;
+
+//		avgs1 += number;
+
+//		avgs1 /= 6;
+
+//avgs2 *= 99;
+//avgs2 += number;
+//avgs2 /= 100;
+
+number++;
+
+	//	update_display(1, 100, avgs1, 2, avgs2, 5);
+//TIM_SetCounter(TIM3, 0);
+
+        }
+ 
+        /* Clear interrupt flag */
+        EXTI_ClearITPendingBit(EXTI_Line0);
+    }
+}
+
+unsigned int sonar_get() {
+    return (unsigned int)SonarValue;
+}
+ 
+int ticks = 0;
+
+int prevnum;
+
+void TIM4_IRQHandler(void)
+{
+        if (TIM_GetITStatus(TIM4, TIM_IT_Update) != RESET)
+        {
+
+			FLAG_ECHO = 1;
+			++ticks;
+	update_display(1, 100, (7*number)/ticks, 2, MedianFilter(7*(number - prevnum)), 30);
+
+prevnum = number;
+            TIM_ClearITPendingBit(TIM4, TIM_IT_Update);
+        }
+}
+ 
+int main(void)
+{
+ 
+display_init();
+
+    SetSysClockTo72();
+ 
+    // TIMER4 Двічі за секунду викликає sonar_start(); і встановлює FLAG_ECHO = 1;
+    TIM_TimeBaseInitTypeDef TIMER_InitStructure;
+    NVIC_InitTypeDef NVIC_InitStructure;
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM4, ENABLE);
+    TIM_TimeBaseStructInit(&TIMER_InitStructure);
+    TIMER_InitStructure.TIM_CounterMode = TIM_CounterMode_Up;
+    TIMER_InitStructure.TIM_Prescaler = 7200;
+    TIMER_InitStructure.TIM_Period = 10000;
+    TIM_TimeBaseInit(TIM4, &TIMER_InitStructure);
+    TIM_ITConfig(TIM4, TIM_IT_Update, ENABLE);
+    TIM_Cmd(TIM4, ENABLE);
+ 
+    /* NVIC Configuration */
+    /* Enable the TIM4_IRQn Interrupt */
+    NVIC_InitStructure.NVIC_IRQChannel = TIM4_IRQn;
+    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
+    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
+    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+    NVIC_Init(&NVIC_InitStructure);
+ 
+    sonar_init();
+ 
 	LCD5110_init();
 	LCD5110_set_XY(0,0);
 	LCD5110_write_string("Hello World");
 
-
-
 	while(1)
 	{
-		//for(int i = 0; i < 1000; i++) 
+
+
+
 		display_number(number, 0);	
-//		xsprintf(str, "%d\n", number);
-//		LCD5110_set_XY(0,0);
-//		LCD5110_write_string(str);
-		//number++;
 	}
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

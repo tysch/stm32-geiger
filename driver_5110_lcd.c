@@ -14,14 +14,6 @@ void Delay_ms(unsigned long nCount)
 }
 
 
-
-
-
-
-
-
-
-
 //Define the LCD Operation function
 void LCD5110_LCD_write_byte(unsigned char dat, unsigned char LCD5110_MOde);
 
@@ -101,11 +93,6 @@ void LCD5110_GPIO_Config() {
 }
 
 
-
-
-
-
-
 /**
  * Initialize LCD module
  *
@@ -169,9 +156,6 @@ void LCD5110_LCD_write_byte(unsigned char dat, unsigned char mode) {
 	LCD5110_CS(1); //SPI_CS = 1;
 
 }
-
-
-
 
 
 /**
@@ -318,12 +302,6 @@ if(c == ' ') c = 10 + '0'; // Hack for padding whitespace
    LCD5110_LCD_write_byte(LCD_SETXADDR, LCD_COMMAND);
 }
 
-
-
-
-
-
-
 void LCD5110_drawBitmap(int x, int y, unsigned char* bitmap, int sx, int sy/*, bool flash*/)
 {
 	int starty, rows;
@@ -382,9 +360,6 @@ void LCD5110_set_XY(unsigned char X, unsigned char Y) {
 	LCD5110_LCD_write_byte(0x40 | Y, LCD_COMMAND);
 	LCD5110_LCD_write_byte(0x80 | x, LCD_COMMAND);
 }
-
-
-
 
 /**
  * Manage CS pin

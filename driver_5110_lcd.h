@@ -33,7 +33,6 @@ void LCD5110_num_string(char *s, int x, int row);
 void LCD5110_SetFont(bool isBig);
 void LCD5110_drawBitmap(int x, int y, unsigned char* bitmap, int sx, int sy/*, bool flash*/);
 
-
 struct lcd_font
 {
     volatile unsigned char* font_ptr;
