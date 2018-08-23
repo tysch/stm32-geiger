@@ -101,7 +101,7 @@ return median->value;
 uint32_t expfilter( uint32_t count)
 {
 	//const int N_AVG = 14;
-	const int N_AVG = 3;
+	const int N_AVG = 8;
 	static uint64_t j = 0;
 	static int round = 0;
 	j = (j << N_AVG) - j + count + round;
