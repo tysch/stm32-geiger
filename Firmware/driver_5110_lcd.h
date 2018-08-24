@@ -5,12 +5,12 @@
 
 #define	LCD_COMMAND	0
 #define LCD_DATA 1
-#define LCD_RESET GPIO_Pin_0
-#define LCD_DC GPIO_Pin_2
-#define LCD_DATA_IN GPIO_Pin_3
-#define LCD_CLK GPIO_Pin_4
-#define LCD_CS GPIO_Pin_1
-#define LCD_BACK_LIGHT 9
+#define LCD_RESET GPIO_Pin_8
+#define LCD_DC GPIO_Pin_10
+#define LCD_DATA_IN GPIO_Pin_11
+#define LCD_CLK GPIO_Pin_12
+#define LCD_CS GPIO_Pin_9
+#define LCD_BACK_LIGHT GPIO_Pin_15
 #define LCD_SETYADDR  0x40
 #define LCD_SETXADDR  0x80
 #define LEFT 0

@@ -4,26 +4,23 @@
 #include <stdio.h>
 #include <string.h>
 
-
-
-void Delay_ms(unsigned long nCount)
+static void Delay_ms(unsigned long nCount)
 {
-  unsigned long t;
-	t = nCount * 40000;
+    volatile unsigned long t;
+	t = nCount * 72000;
 	while(t--);
 }
-
 
 //Define the LCD Operation function
 void LCD5110_LCD_write_byte(unsigned char dat, unsigned char LCD5110_MOde);
 
 //Define the hardware operation function
-void LCD5110_GPIO_Config(void);
-void LCD5110_SCK(unsigned char temp);
-void LCD5110_DIN(unsigned char temp);
-void LCD5110_CS(unsigned char temp);
-void LCD5110_RST(unsigned char temp);
-void LCD5110_DC(unsigned char temp);
+static void LCD5110_GPIO_Config(void);
+static void LCD5110_SCK(unsigned char temp);
+static void LCD5110_DIN(unsigned char temp);
+static void LCD5110_CS(unsigned char temp);
+static void LCD5110_RST(unsigned char temp);
+static void LCD5110_DC(unsigned char temp);
 
 
 void LCD5110_SetFont(bool isBig) 
@@ -50,9 +47,6 @@ void LCD5110_SetFont(bool isBig)
    
 }
 
-
-
-
 /**
  * Set pin configuration. Doesn't use SPI controller. Just regular pins.
  *
@@ -66,26 +60,33 @@ void LCD5110_SetFont(bool isBig)
  * @param None
  * @retval None
  */
-void LCD5110_GPIO_Config() {
+void LCD5110_GPIO_Config(void) {
   
     GPIO_InitTypeDef GPIO_InitStructure;
 
-	RCC_HSICmd(DISABLE);
-	RCC_PLLConfig(RCC_PLLSource_HSE_Div1,RCC_PLLMul_9);
-	RCC_PLLCmd(ENABLE);
-	RCC_SYSCLKConfig(RCC_SYSCLKSource_PLLCLK);
+//	RCC_HSICmd(DISABLE);
+//	RCC_PLLConfig(RCC_PLLSource_HSE_Div1,RCC_PLLMul_9);
+//	RCC_PLLCmd(ENABLE);
+//	RCC_SYSCLKConfig(RCC_SYSCLKSource_PLLCLK);
 
 //RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA|RCC_APB2Periph_GPIOC, ENABLE);
 
-	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA | RCC_APB2Periph_GPIOB, ENABLE);
 
     // Declare pins to configure
-    GPIO_InitStructure.GPIO_Pin = LCD_RESET | LCD_DC |  LCD_DATA_IN | LCD_CLK | LCD_CS; 
+    GPIO_InitStructure.GPIO_Pin = LCD_RESET | LCD_DC |  LCD_DATA_IN | LCD_CLK | LCD_CS;// | LCD_BACK_LIGHT; 
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_10MHz;
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
     
     // Init Port
     GPIO_Init(GPIOA, &GPIO_InitStructure);
+
+
+
+	GPIO_InitStructure.GPIO_Pin = LCD_BACK_LIGHT; 
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_10MHz;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
+	GPIO_Init(GPIOB, &GPIO_InitStructure);
     
     // Setup default font and size.
     LCD5110_SetFont(true);
@@ -99,7 +100,7 @@ void LCD5110_GPIO_Config() {
  * Input parameters : none
  * Return value		: none
  */
-void LCD5110_init() {
+void LCD5110_init(void) {
 
 	//Configure pins
 	LCD5110_GPIO_Config();
@@ -337,7 +338,7 @@ void LCD5110_drawBitmap(int x, int y, unsigned char* bitmap, int sx, int sy/*, b
  * @param None
  * @retval None
  */
-void LCD5110_clear() {
+void LCD5110_clear(void) {
 	unsigned char i, j;
 	for (i = 0; i < 6; i++)
 		for (j = 0; j < 84; j++)
@@ -367,7 +368,7 @@ void LCD5110_set_XY(unsigned char X, unsigned char Y) {
  * @param state: pin state (0 or 1)
  * @retval None
  */
-void LCD5110_CS(unsigned char state) {
+static void LCD5110_CS(unsigned char state) {
 	if (state == 0)
 		GPIO_ResetBits(GPIOA, LCD_CS);
 	else
@@ -380,7 +381,7 @@ void LCD5110_CS(unsigned char state) {
  * @param state: pin state (0 or 1)
  * @retval None
  */
-void LCD5110_RST(unsigned char state) {
+static void LCD5110_RST(unsigned char state) {
 	if (state == 0)
 		GPIO_ResetBits(GPIOA, LCD_RESET);
 	else
@@ -393,7 +394,7 @@ void LCD5110_RST(unsigned char state) {
  * @param state: pin state (0 or 1)
  * @retval None
  */
-void LCD5110_DC(unsigned char state) {
+static void LCD5110_DC(unsigned char state) {
 	if (state == 0)
 		GPIO_ResetBits(GPIOA, LCD_DC);
 	else
@@ -406,7 +407,7 @@ void LCD5110_DC(unsigned char state) {
  * @param state: pin state (0 or 1)
  * @retval None
  */
-void LCD5110_DIN(unsigned char state) {
+static void LCD5110_DIN(unsigned char state) {
 	if (state == 0)
 		GPIO_ResetBits(GPIOA, LCD_DATA_IN);
 	else
@@ -419,7 +420,7 @@ void LCD5110_DIN(unsigned char state) {
  * @param state: pin state (0 or 1)
  * @retval None
  */
-void LCD5110_SCK(unsigned char state) {
+static void LCD5110_SCK(unsigned char state) {
 	if (state == 0)
 		GPIO_ResetBits(GPIOA, LCD_CLK);
 	else
@@ -433,8 +434,8 @@ void LCD5110_SCK(unsigned char state) {
  * @retval None
  */
 void LCD5110_Led(unsigned char state) {
-	if (state == 0)
-		GPIO_SetBits(GPIOA, LCD_BACK_LIGHT);
+	if (state)
+		GPIO_SetBits(GPIOB, LCD_BACK_LIGHT);
 	else
-		GPIO_ResetBits(GPIOA, LCD_BACK_LIGHT);
+		GPIO_ResetBits(GPIOB, LCD_BACK_LIGHT);
 }
