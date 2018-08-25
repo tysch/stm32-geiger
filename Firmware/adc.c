@@ -3,7 +3,7 @@
 #include "stm32_lib/system_stm32f10x.h"
 
 #define VCC_DIV 4096 // VCC_DIV = k * 4096
-
+#define VREF 1210    // in millivolts
 
 
 //Initialize internal ADC, internal voltage reference
@@ -79,25 +79,23 @@ void vcc_voltage_monitor_init(void)
     adc1_init();
     adc2_init();
 
-
 // Connect ADC to Vbat
-	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
 
-	GPIO_InitTypeDef GPIOB_Init;
-	GPIOB_Init.GPIO_Pin = GPIO_Pin_10;
-	GPIOB_Init.GPIO_Speed = GPIO_Speed_2MHz;
-	GPIOB_Init.GPIO_Mode = GPIO_Mode_Out_PP;
+    GPIO_InitTypeDef GPIOB_Init;
+    GPIOB_Init.GPIO_Pin = GPIO_Pin_10;
+    GPIOB_Init.GPIO_Speed = GPIO_Speed_2MHz;
+    GPIOB_Init.GPIO_Mode = GPIO_Mode_Out_PP;
 
-	GPIO_Init(GPIOB,&GPIOB_Init);
+    GPIO_Init(GPIOB,&GPIOB_Init);
 
-	GPIO_SetBits(GPIOB, GPIO_Pin_10);
-
+    GPIO_SetBits(GPIOB, GPIO_Pin_10);
 }
 
 uint16_t vcc_voltage(void) // in millivolts
 {
     uint32_t val = get_adc2_value();
-    val *= 1210;
+    val *= VREF;
     val /= get_adc1_value();
     return val;
 }

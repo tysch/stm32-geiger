@@ -93,7 +93,7 @@ static char main_val_str[16];
 static char sec_val_str_prefix[2];
 
 
-void update_display(char sound, char battery_charge, uint32_t main_val, char main_err, uint32_t fast_val, char fast_err)
+void update_display(uint8_t sound, uint8_t battery_charge, uint32_t main_val, char main_err, uint32_t fast_val, char fast_err)
 {
     const static char tick = 'z' + 5;
     const static char battery = 'z' + 4;
