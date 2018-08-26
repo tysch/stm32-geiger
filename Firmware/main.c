@@ -65,7 +65,6 @@ void SetSysClockTo72(void)
 {
     ErrorStatus HSEStartUpStatus;
     // SYSCLK, HCLK, PCLK2 and PCLK1 configuration 
-    // RCC system reset(for debug purpose)
     RCC_DeInit();
     // Enable HSE 
     RCC_HSEConfig(RCC_HSE_ON);
@@ -79,24 +78,11 @@ void SetSysClockTo72(void)
         RCC_PCLK2Config( RCC_HCLK_Div1);
         // PCLK1 = HCLK/2
         RCC_PCLK1Config( RCC_HCLK_Div2);
-        // PLLCLK = 8MHz * 9 = 72 MHz 
-        RCC_PLLConfig(0x00010000, RCC_PLLMul_9);
-        // Enable PLL 
-        RCC_PLLCmd( ENABLE);
-        // Wait till PLL is ready 
-        while (RCC_GetFlagStatus(RCC_FLAG_PLLRDY) == RESET)
-        {
-        }
-        // Select PLL as system clock source 
-        RCC_SYSCLKConfig( RCC_SYSCLKSource_PLLCLK);
-        /// Wait till PLL is used as system clock source 
-        while (RCC_GetSYSCLKSource() != 0x08)
-        {
-        }
+        // Select HSE as system clock source 
+        RCC_SYSCLKConfig(RCC_SYSCLKSource_HSE);
     }
     else
     { // If HSE fails to start-up, the application will have wrong clock configuration.
-    // User can add here some code to deal with this error 
         while (1)
         {
         }
@@ -112,7 +98,8 @@ void init_display_timer(void)
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM4, ENABLE);
     TIM_TimeBaseStructInit(&TIMER_InitStructure);
     TIMER_InitStructure.TIM_CounterMode = TIM_CounterMode_Up;
-    TIMER_InitStructure.TIM_Prescaler = 7200;
+  //  TIMER_InitStructure.TIM_Prescaler = 7200;
+    TIMER_InitStructure.TIM_Prescaler = 800;
     TIMER_InitStructure.TIM_Period = 10000;
     TIM_TimeBaseInit(TIM4, &TIMER_InitStructure);
     TIM_ITConfig(TIM4, TIM_IT_Update, ENABLE);
@@ -347,7 +334,7 @@ void EXTI1_IRQHandler(void)
     // Make sure that interrupt flag is set
     if(EXTI_GetITStatus(EXTI_Line1) != RESET) 
     {
-       // if(GPIO_ReadInputDataBit(GPIOB, GPIO_Pin_1) != 0)
+        if(GPIO_ReadInputDataBit(GPIOB, GPIO_Pin_1) != 0)
         {
             ++counts; // Total particles detected
 
@@ -425,6 +412,9 @@ void TIM4_IRQHandler(void)
 int main(void)
 {
     SetSysClockTo72();
+ LCD5110_init();
+
+
 
     pushbuttons_init();
     vcc_voltage_monitor_init();
@@ -434,7 +424,7 @@ int main(void)
 
     init_display_timer();
 
-    LCD5110_init();
+   
     LCD5110_Led(0); 
     LCD5110_set_XY(0,0);
     LCD5110_write_string("Initializing..");
@@ -447,6 +437,7 @@ int main(void)
  
     while(1)
     {
-        display_number(counts, 0);	
+        display_number(++counts, 0);	
+        //__WFE();
     }
 }

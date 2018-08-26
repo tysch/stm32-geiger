@@ -11,7 +11,8 @@ void led_init(void)
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
     TIM_TimeBaseStructInit(&TIMER_InitStructure);
     TIMER_InitStructure.TIM_CounterMode = TIM_CounterMode_Up;
-    TIMER_InitStructure.TIM_Prescaler = 7200;
+   //   TIMER_InitStructure.TIM_Prescaler = 7200;
+    TIMER_InitStructure.TIM_Prescaler = 800;
     TIMER_InitStructure.TIM_Period = 100;
     TIM_TimeBaseInit(TIM2, &TIMER_InitStructure);
     TIM_ITConfig(TIM2, TIM_IT_Update, ENABLE);

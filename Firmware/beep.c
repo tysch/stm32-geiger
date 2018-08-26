@@ -10,10 +10,10 @@ void beep_init(void)
     GPIOC_Init.GPIO_Speed = GPIO_Speed_50MHz;
     GPIOC_Init.GPIO_Mode = GPIO_Mode_Out_PP;
 
-    RCC_HSICmd(DISABLE);
-    RCC_PLLConfig(RCC_PLLSource_HSE_Div1,RCC_PLLMul_9);
-    RCC_PLLCmd(ENABLE);
-    RCC_SYSCLKConfig(RCC_SYSCLKSource_PLLCLK);
+  //  RCC_HSICmd(DISABLE);
+  //  RCC_PLLConfig(RCC_PLLSource_HSE_Div1,RCC_PLLMul_9);
+  //  RCC_PLLCmd(ENABLE);
+  //  RCC_SYSCLKConfig(RCC_SYSCLKSource_PLLCLK);
 
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOC, ENABLE);
     GPIO_Init(GPIOC,&GPIOC_Init);
