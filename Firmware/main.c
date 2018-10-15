@@ -4,11 +4,10 @@
 #include "stm32_lib/stm32f10x_conf.h"
 #include "stm32_lib/system_stm32f10x.h"
 
-#include "led_display.h"
-#include "driver_5110_lcd.h"
-#include "display.h"
 #include "xprintf.h"
+#include "driver_5110_lcd.h"
 
+#include "display.h"
 #include "filters.h"
 #include "adc.h"
 #include "beep.h"
@@ -25,12 +24,9 @@
 #define NRH_PER_CPS 7000                // multiplier, nR/h per one pulse per second
 
 #define BUTTON_LONG_PRESS_DELAY 2       // in seconds
-#define BUTTON_VERY_LONG_PRESS_DELAY 5
 
 #define MAX_VOLTAGE 4200                // Voltage range for battery
-#define MIN_VOLTAGE 3000
-
-#define SHUTDOWN_VOLTAGE 3200           // Undervoltage shutdown threshold
+#define MIN_VOLTAGE 2700
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -53,6 +49,8 @@ static volatile uint8_t backlight = 0;
 static volatile uint8_t is_beeping;
 static volatile uint8_t batt_charge;
 
+static uint8_t vcc_voltage_monitor_started = 0;
+
 uint32_t invsqrt(uint32_t n);
 
 /////////////////////////////////////////////////////////////////////////////////////////////
@@ -61,7 +59,20 @@ uint32_t invsqrt(uint32_t n);
 //
 /////////////////////////////////////////////////////////////////////////////////////////////
 
-void SetSysClockTo72(void)
+
+void watchdog_timer_init (void) // Fires each 3,5 seconds
+{
+  /* Enable the LSI OSC */
+	RCC_LSICmd(ENABLE);   //Enable LSI Oscillator
+	while (RCC_GetFlagStatus(RCC_FLAG_LSIRDY) == RESET) {}// Wait till LSI is ready
+	IWDG_WriteAccessCmd(IWDG_WriteAccess_Enable);         // Enable Watchdog
+	IWDG_SetPrescaler(IWDG_Prescaler_32);                 // 4, 8, 16 ... 256
+	IWDG_SetReload(0x0FFF);                     //This parameter must be a number between 0 and 0x0FFF.
+	IWDG_ReloadCounter();                       //Initial watchdog reset
+	IWDG_Enable();
+}
+
+void SetHSE(void)
 {
     ErrorStatus HSEStartUpStatus;
     // SYSCLK, HCLK, PCLK2 and PCLK1 configuration 
@@ -98,7 +109,7 @@ void init_display_timer(void)
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM4, ENABLE);
     TIM_TimeBaseStructInit(&TIMER_InitStructure);
     TIMER_InitStructure.TIM_CounterMode = TIM_CounterMode_Up;
-  //  TIMER_InitStructure.TIM_Prescaler = 7200;
+    // TIMER_InitStructure.TIM_Prescaler = 7200;
     TIMER_InitStructure.TIM_Prescaler = 800;
     TIMER_InitStructure.TIM_Period = 10000;
     TIM_TimeBaseInit(TIM4, &TIMER_InitStructure);
@@ -107,12 +118,22 @@ void init_display_timer(void)
  
     // Enable the TIM4_IRQn Interrupt 
     NVIC_InitStructure.NVIC_IRQChannel = TIM4_IRQn;
-    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 2;
+    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;
     NVIC_InitStructure.NVIC_IRQChannelSubPriority = 2;
     NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
     NVIC_Init(&NVIC_InitStructure);
 }
 
+void pushbuttons_gpio_init(void)
+{
+    GPIO_InitTypeDef GPIO_InitStruct;
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);
+    // Set pins as input 
+    GPIO_InitStruct.GPIO_Pin = GPIO_Pin_0 | GPIO_Pin_2;
+    GPIO_InitStruct.GPIO_Mode = GPIO_Mode_IPD; // Pulldown
+    GPIO_InitStruct.GPIO_Speed = GPIO_Speed_2MHz;
+    GPIO_Init(GPIOA, &GPIO_InitStruct);
+}
 
 // Sets interrupts for pushbuttons on A0 and A2
 void pushbuttons_init(void)
@@ -120,27 +141,21 @@ void pushbuttons_init(void)
     //EXTI
 
     // Set variables used
-    GPIO_InitTypeDef GPIO_InitStruct;
+    
     EXTI_InitTypeDef EXTI_InitStruct;
     NVIC_InitTypeDef NVIC_InitStruct;
 
     // Enable clock for AFIO 
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);
+    // Pushbuttons GPIO was iniialized upon watchdog reset
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO, ENABLE);
-
-    // Set pin as input 
-    GPIO_InitStruct.GPIO_Pin = GPIO_Pin_0 | GPIO_Pin_2;
-    GPIO_InitStruct.GPIO_Mode = GPIO_Mode_IPD; // Pulldown
-    GPIO_InitStruct.GPIO_Speed = GPIO_Speed_2MHz;
-    GPIO_Init(GPIOA, &GPIO_InitStruct);
 
     // Add IRQ vector to NVIC
     // PB0 is connected to EXTI_Line0, which has EXTI0_IRQn vector 
     NVIC_InitStruct.NVIC_IRQChannel = EXTI0_IRQn;
     // Set priority
-    NVIC_InitStruct.NVIC_IRQChannelPreemptionPriority = 0x02;
+    NVIC_InitStruct.NVIC_IRQChannelPreemptionPriority = 1;
     // Set sub priority
-    NVIC_InitStruct.NVIC_IRQChannelSubPriority = 0x03;
+    NVIC_InitStruct.NVIC_IRQChannelSubPriority = 1;
     // Enable interrupt
     NVIC_InitStruct.NVIC_IRQChannelCmd = ENABLE;
     // Add to NVIC
@@ -164,9 +179,9 @@ void pushbuttons_init(void)
     // PB0 is connected to EXTI_Line2, which has EXTI2_IRQn vector
     NVIC_InitStruct.NVIC_IRQChannel = EXTI2_IRQn;
     // Set priority
-    NVIC_InitStruct.NVIC_IRQChannelPreemptionPriority = 0x03;
+    NVIC_InitStruct.NVIC_IRQChannelPreemptionPriority = 1;
     // Set sub priority
-    NVIC_InitStruct.NVIC_IRQChannelSubPriority = 0x05;
+    NVIC_InitStruct.NVIC_IRQChannelSubPriority = 1;
     // Enable interrupt
     NVIC_InitStruct.NVIC_IRQChannelCmd = ENABLE;
     // Add to NVIC
@@ -202,17 +217,17 @@ void geiger_counter_input_init()
 
     // Set pin as input
     GPIO_InitStruct.GPIO_Pin = GPIO_Pin_1;
-    GPIO_InitStruct.GPIO_Mode = GPIO_Mode_IPU;
-    GPIO_InitStruct.GPIO_Speed = GPIO_Speed_2MHz;
+    GPIO_InitStruct.GPIO_Mode = GPIO_Mode_IPD;
+    GPIO_InitStruct.GPIO_Speed = GPIO_Speed_10MHz;
     GPIO_Init(GPIOB, &GPIO_InitStruct);
  
     // Add IRQ vector to NVIC
-    // PB0 is connected to EXTI_Line0, which has EXTI0_IRQn vector
+    // PB1 is connected to EXTI_Line1, which has EXTI1_IRQn vector
     NVIC_InitStruct.NVIC_IRQChannel = EXTI1_IRQn;
-    // Set priority 
-    NVIC_InitStruct.NVIC_IRQChannelPreemptionPriority = 0x00;
+    // Set maximum possible priority 
+    NVIC_InitStruct.NVIC_IRQChannelPreemptionPriority = 0;
     // Set sub priority
-    NVIC_InitStruct.NVIC_IRQChannelSubPriority = 0x00;
+    NVIC_InitStruct.NVIC_IRQChannelSubPriority = 0;
     // Enable interrupt
     NVIC_InitStruct.NVIC_IRQChannelCmd = ENABLE;
     // Add to NVIC
@@ -289,7 +304,7 @@ void shutdown(void)
     PWR_EnterSTANDBYMode();
 }
 
-void reset_count(void)
+void reset_counts(void)
 {
     seconds = 0;
     counts = 0;
@@ -304,8 +319,7 @@ void button_1_shutdown(int is_pressed)
     if(is_pressed) cnt++;
     else           cnt = 0;
 
-    if(cnt > BUTTON_LONG_PRESS_DELAY) reset_count();
-    if(cnt > BUTTON_VERY_LONG_PRESS_DELAY) shutdown();
+    if(cnt > BUTTON_LONG_PRESS_DELAY) shutdown();
 }
 
 void button_2_toggle_beeping(int is_pressed)
@@ -368,6 +382,9 @@ void compute_and_display_values(void)
     uint32_t fast_nrh;
     uint32_t fast_error;
 
+    // Check for integer overflows
+    if(counts > (2*1000*1000*1000/NRH_PER_CPS)) reset_counts();
+
     tmp = NRH_PER_CPS * counts / seconds; // compute averaged intensity
 
     if(tmp < background_nrh) nrh = 0;
@@ -381,7 +398,7 @@ void compute_and_display_values(void)
         if(err > 99) err = 99;
     }
 
-    fast_nrh = median_filter(NRH_PER_CPS*(counts-prev_counts)); // median filtered 3 last readings
+    fast_nrh = median_filter(NRH_PER_CPS*(counts-prev_counts)); // median filtered 5 last readings
     fast_error = invsqrt(fast_nrh / NRH_PER_CPS);
 
     LCD5110_clear();
@@ -397,7 +414,11 @@ void TIM4_IRQHandler(void)
         ++seconds;
 
         voltage = vcc_voltage();
-        batt_charge = (voltage - MIN_VOLTAGE) / ((MAX_VOLTAGE - MIN_VOLTAGE) / 100);
+
+        if((voltage < MIN_VOLTAGE) && vcc_voltage_monitor_started)
+            shutdown();
+        else 
+            batt_charge = (voltage - MIN_VOLTAGE) / ((MAX_VOLTAGE - MIN_VOLTAGE) / 100);
 
         button_1_shutdown(GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_0));
         button_2_toggle_beeping(GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_2));
@@ -405,39 +426,61 @@ void TIM4_IRQHandler(void)
         compute_and_display_values();
 
         prev_counts = counts;
+
+        IWDG_ReloadCounter();
+
         TIM_ClearITPendingBit(TIM4, TIM_IT_Update);
     }
 }
 
+void enable_display_power(void)
+{
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
+    GPIO_InitTypeDef GPIOB_Init;
+    GPIOB_Init.GPIO_Pin = GPIO_Pin_10;
+    GPIOB_Init.GPIO_Speed = GPIO_Speed_2MHz;
+    GPIOB_Init.GPIO_Mode = GPIO_Mode_Out_PP;
+    GPIO_Init(GPIOB,&GPIOB_Init);
+
+    GPIO_ResetBits(GPIOB, GPIO_Pin_10);
+}
+
+
 int main(void)
 {
-    SetSysClockTo72();
- LCD5110_init();
+    pushbuttons_gpio_init();
+    watchdog_timer_init();
+    IWDG_ReloadCounter();
 
+    if(GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_0) == 0) // Waked up upon IWDT reset
+        shutdown();
 
+    SetHSE();
+    NVIC_PriorityGroupConfig(NVIC_PriorityGroup_1);
 
-    pushbuttons_init();
-    vcc_voltage_monitor_init();
-    display_init();
-    beep_init();
-    led_init();
+    enable_display_power();
 
-    init_display_timer();
-
-   
+    LCD5110_init();
     LCD5110_Led(0); 
     LCD5110_set_XY(0,0);
     LCD5110_write_string("Initializing..");
 
+    pushbuttons_init();
+    vcc_voltage_monitor_init();
+    beep_init();
+    led_init();
+
+    init_display_timer();
     geiger_counter_input_init();
 
     // ENABLE Wake Up Pin
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR,ENABLE);
     PWR_WakeUpPinCmd(ENABLE);
+
+    vcc_voltage_monitor_started = 1;
  
     while(1)
     {
-        display_number(++counts, 0);	
-        //__WFE();
+        __WFE();
     }
 }

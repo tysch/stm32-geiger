@@ -4,25 +4,20 @@
 
 void beep_init(void)
 {
-    GPIO_InitTypeDef GPIOC_Init;
+    GPIO_InitTypeDef GPIOB_Init;
 
-    GPIOC_Init.GPIO_Pin = GPIO_Pin_13 |GPIO_Pin_14;
-    GPIOC_Init.GPIO_Speed = GPIO_Speed_50MHz;
-    GPIOC_Init.GPIO_Mode = GPIO_Mode_Out_PP;
+    GPIOB_Init.GPIO_Pin = GPIO_Pin_12 |GPIO_Pin_13;
+    GPIOB_Init.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIOB_Init.GPIO_Mode = GPIO_Mode_Out_PP;
 
-  //  RCC_HSICmd(DISABLE);
-  //  RCC_PLLConfig(RCC_PLLSource_HSE_Div1,RCC_PLLMul_9);
-  //  RCC_PLLCmd(ENABLE);
-  //  RCC_SYSCLKConfig(RCC_SYSCLKSource_PLLCLK);
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
+    GPIO_Init(GPIOB, &GPIOB_Init);
 
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOC, ENABLE);
-    GPIO_Init(GPIOC,&GPIOC_Init);
-
-    GPIO_WriteBit(GPIOC, GPIO_Pin_13, Bit_SET); 
-    GPIO_WriteBit(GPIOC, GPIO_Pin_14, Bit_RESET); 
+    GPIO_WriteBit(GPIOB, GPIO_Pin_12, Bit_SET); 
+    GPIO_WriteBit(GPIOB, GPIO_Pin_13, Bit_RESET); 
 }
 
 void beep(void) // Bridge connected piezo buzzer to pins C13 and C14
 {
-    GPIOC->ODR ^= (GPIO_Pin_13 | GPIO_Pin_14);
+    GPIOB->ODR ^= (GPIO_Pin_12 | GPIO_Pin_13);
 }

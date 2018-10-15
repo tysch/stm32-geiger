@@ -138,5 +138,5 @@ void update_display(uint8_t sound, uint8_t battery_charge, uint32_t main_val, ch
 
     LCD5110_write_string(str);
 
-    LCD5110_num_string(main_val_str,9,10);
+    LCD5110_num_string(main_val_str,8,2);
 }

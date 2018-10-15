@@ -11,7 +11,7 @@ void led_init(void)
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
     TIM_TimeBaseStructInit(&TIMER_InitStructure);
     TIMER_InitStructure.TIM_CounterMode = TIM_CounterMode_Up;
-   //   TIMER_InitStructure.TIM_Prescaler = 7200;
+    // TIMER_InitStructure.TIM_Prescaler = 7200;
     TIMER_InitStructure.TIM_Prescaler = 800;
     TIMER_InitStructure.TIM_Period = 100;
     TIM_TimeBaseInit(TIM2, &TIMER_InitStructure);
@@ -26,25 +26,20 @@ void led_init(void)
     NVIC_Init(&NVIC_InitStructure);
 
     // C15 port for LED
-    GPIO_InitTypeDef GPIOC_Init;
-    GPIOC_Init.GPIO_Pin = GPIO_Pin_15;
-    GPIOC_Init.GPIO_Speed = GPIO_Speed_10MHz;
-    GPIOC_Init.GPIO_Mode = GPIO_Mode_Out_PP;
+    GPIO_InitTypeDef GPIOB_Init;
+    GPIOB_Init.GPIO_Pin = GPIO_Pin_14;
+    GPIOB_Init.GPIO_Speed = GPIO_Speed_10MHz;
+    GPIOB_Init.GPIO_Mode = GPIO_Mode_Out_PP;
 
-//RCC_HSICmd(DISABLE);
-//RCC_PLLConfig(RCC_PLLSource_HSE_Div1,RCC_PLLMul_9);
-//RCC_PLLCmd(ENABLE);
-//RCC_SYSCLKConfig(RCC_SYSCLKSource_PLLCLK);
-
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOC, ENABLE);
-    GPIO_Init(GPIOC,&GPIOC_Init);
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
+    GPIO_Init(GPIOB, &GPIOB_Init);
 }
 
 void TIM2_IRQHandler(void)
 {
     if (TIM_GetITStatus(TIM2, TIM_IT_Update) != RESET)
     {
-        GPIO_WriteBit(GPIOC, GPIO_Pin_15, Bit_RESET);
+        GPIO_WriteBit(GPIOB, GPIO_Pin_14, Bit_RESET);
         TIM_Cmd(TIM2, DISABLE);
         TIM_ClearITPendingBit(TIM2, TIM_IT_Update);
     }
@@ -54,5 +49,5 @@ void led_blink(void)
 {
     TIM_Cmd(TIM2, ENABLE); // LED BLINK
     TIM_SetCounter(TIM2, 0);
-    GPIO_WriteBit(GPIOC, GPIO_Pin_15, Bit_SET);
+    GPIO_WriteBit(GPIOB, GPIO_Pin_14, Bit_SET);
 }

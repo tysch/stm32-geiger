@@ -48,7 +48,6 @@ void adc2_init(void)
     ADC_Init(ADC2, &ADC_InitStructure);
     ADC_Cmd(ADC2, ENABLE);
 
-
     // channel select
     ADC_RegularChannelConfig(ADC2, ADC_Channel_8, 1, ADC_SampleTime_239Cycles5);
 
@@ -74,28 +73,60 @@ uint16_t get_adc2_value(void)
     return ADC_GetConversionValue(ADC2);
 }
 
+
+TIM_OCInitTypeDef timerPWM;
+
+// Generate PWM for forming reference voltage for HV power supply
+void vref_out_init(void) 
+{
+    GPIO_InitTypeDef port;
+    TIM_TimeBaseInitTypeDef timer;
+    
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3, ENABLE);
+ 
+    GPIO_StructInit(&port);
+    port.GPIO_Mode = GPIO_Mode_AF_PP;
+    port.GPIO_Pin = GPIO_Pin_7;
+    port.GPIO_Speed = GPIO_Speed_2MHz;
+    GPIO_Init(GPIOA, &port);
+ 
+    TIM_TimeBaseStructInit(&timer);
+    timer.TIM_Prescaler = 1;
+    timer.TIM_Period = 4096;            // To match ADC range; pulse count == ADC readings
+    timer.TIM_ClockDivision = 0;
+    timer.TIM_CounterMode = TIM_CounterMode_Up;
+    TIM_TimeBaseInit(TIM3, &timer);
+ 
+    TIM_OCStructInit(&timerPWM);
+    timerPWM.TIM_OCMode = TIM_OCMode_PWM1;
+    timerPWM.TIM_OutputState = TIM_OutputState_Enable;
+    timerPWM.TIM_Pulse = 0;
+    timerPWM.TIM_OCPolarity = TIM_OCPolarity_High;
+    TIM_OC2Init(TIM3, &timerPWM);
+ 
+    TIM_Cmd(TIM3, ENABLE);
+}
+
+
+
 void vcc_voltage_monitor_init(void)
 {
     adc1_init();
     adc2_init();
-
-// Connect ADC to Vbat
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
-
-    GPIO_InitTypeDef GPIOB_Init;
-    GPIOB_Init.GPIO_Pin = GPIO_Pin_10;
-    GPIOB_Init.GPIO_Speed = GPIO_Speed_2MHz;
-    GPIOB_Init.GPIO_Mode = GPIO_Mode_Out_PP;
-
-    GPIO_Init(GPIOB,&GPIOB_Init);
-
-    GPIO_SetBits(GPIOB, GPIO_Pin_10);
+    vref_out_init();
 }
 
 uint16_t vcc_voltage(void) // in millivolts
 {
-    uint32_t val = get_adc2_value();
+    uint32_t val = get_adc2_value() * 2; // Compensate input divider
+    uint32_t vref = get_adc1_value();
+
     val *= VREF;
-    val /= get_adc1_value();
+    val /= vref;
+
+    timerPWM.TIM_Pulse = vref; // Set DTC = Vcc/Vref
+    TIM_OC2Init(TIM3, &timerPWM);
+
     return val;
 }
